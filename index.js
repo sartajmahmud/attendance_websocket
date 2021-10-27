@@ -58,18 +58,18 @@ wss.on('connection', function connection(ws){
       con.query(userQuery, function (err, result, fields) {
          if (err) throw err;
          userData = result[0];
-         console.log(userData.id);
+         console.log(userData.name);
          var locationQuery = "SELECT * FROM locations WHERE id = "+userData.location_id;
          con.query(locationQuery, function (err, result, fields) {
             if (err) throw err;
             userAssignedLocationData = result[0];
-            console.log(result[0]);
+            console.log(result[0].name);
          });
          var networkQuery = "SELECT * FROM networks WHERE id = "+userData.network_id;
          con.query(networkQuery, function (err, result, fields) {
             if (err) throw err;
             userAssignedNetworkData = result[0];
-            console.log(result[0]);
+            console.log(result[0].ssid);
              if(userData.attendance_type == 1){
                console.log("location attendance")
                 var mapResultAPI = 'https://maps.googleapis.com/maps/api/directions/json?origin=' + parts[1] +','+parts[2]+'&destination='+userAssignedLocationData.latitude +','+userAssignedLocationData.longitude +'&key='+mapAPIKey;
@@ -77,9 +77,78 @@ wss.on('connection', function connection(ws){
                 request(mapResultAPI, function (error, response, body) {
                    console.error('error:', error); // Print the error if one occurred
                    console.log('statusCode:', response && response.statusCode); // Print the response status code if a response was received
-                   console.log('body:', body); //
+                   //console.log('body:', body); //
                    console.log(typeof body);
+                   var parsedval = JSON.parse(body);
+                   //console.log(parsedval['routes'][0]['legs'][0]['distance']['value']);
+                   var distance = parsedval['routes'][0]['legs'][0]['distance']['value'];
                    //console.log('response: ', response)// Print the HTML for the Google homepage.
+
+                   if(distance <= userAssignedLocationData.radius){
+                      console.log('inside radius');
+                      var attendance = "SELECT * FROM attendances WHERE user_id ="+userData.id+" ORDER BY id DESC";
+                      con.query(attendance, function (err, result, fields) {
+                         if (err) throw err;
+                         console.log(result);
+                         if(result.length != 0){
+                            var newEntryQuery = "INSERT INTO attendances (user_id, entry_time, created_at, updated_at) VALUES( "+userData.id+", now(), now(), now() )";
+                            con.query(newEntryQuery, function (err, result, fields){
+                               if (err) throw err;
+                               console.log(result);
+                               console.log('Entry Successful');
+                            });
+                         }else if(result[0].entry_time != null){
+                            var entryQuery = "UPDATE attendances SET entry_time = NOW(), updated_at = now() WHERE user_id = "+userData.id;
+                            con.query(entryQuery, function (err, result, fields){
+                               if (err) throw err;
+                               console.log(result);
+                               console.log('Entry Successful');
+                            });
+                         }else{
+                            var rowResult = JSON.parse(JSON.stringify(result[0]));
+                            var one_day = 1000 * 60 * 60 * 24;
+                            var nodeTime = Date.now();
+                            var mysqlTime = new Date(rowResult.entry_time).getTime();
+                            console.log('nodetime' +nodeTime);
+                            console.log('mysqltime' +mysqlTime);
+                            if ((nodeTime-one_day)<mysqlTime) {
+                               console.log('difference is less than one day');
+                               //if difference is less than 1 day then already exists;
+                            }else{
+                               var newEntryQuery = "INSERT INTO attendances (user_id, entry_time, created_at, updated_at) VALUES( "+userData.id+", now(), now(), now() )";
+                               con.query(newEntryQuery, function (err, result, fields){
+                                  if (err) throw err;
+                                  console.log(result);
+                                  console.log('Entry Successful');
+                               });
+                            }
+                         }
+                      });
+                   }else{
+                      console.log('outside radius');
+                      var attendance = "SELECT * FROM attendances WHERE user_id ="+userData.id+" ";
+                      con.query(attendance, function (err, result, fields) {
+                         if (err) throw err;
+                         console.log(result.length);
+                         if(result.length != 0){
+                            //console.log("exit"+result[0].exit_time+'12'+result[0].exit_time.length);
+                            if(result[0].exit_time != null && result[0].exit_time.length != 0){
+                               console.log('already exists');
+                            }else if (result[0].entry_time != null){
+                               var exitUpdateQuery = "UPDATE attendances SET exit_time = NOW(), updated_at = now() WHERE user_id = "+userData.id;
+                               con.query(exitUpdateQuery, function (err, result, fields){
+                                  if (err) throw err;
+                                  console.log('Entry Successful');
+                               });
+                            }else{
+                               console.log('Entry first1')
+                            }
+                         }else{
+                            console.log('Entry first2');
+                         }
+
+                      });
+                   }
                 });
 
              }else if(userData.attendance_type == 2){
@@ -88,7 +157,7 @@ wss.on('connection', function connection(ws){
                 if(userAssignedNetworkData.ssid == parts[3]){
                   console.log('ssid match');
                         //need to query this in descending order and pick the first one.
-                         var attendance = "SELECT * FROM attendances WHERE user_id ="+userData.id+" ";
+                         var attendance = "SELECT * FROM attendances WHERE user_id ="+userData.id+" ORDER BY id DESC";
                          con.query(attendance, function (err, result, fields) {
                             if (err) throw err;
                             console.log(result);
