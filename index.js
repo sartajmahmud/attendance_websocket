@@ -6,8 +6,8 @@ var mysql = require('mysql2');
 var con = mysql.createConnection({
    host: "localhost",
    user: "root",
-   password: "root@r0b0t1cs",
-   database: "erp_attendance"
+   password: "*2021Amarbebsha",
+   database: "hr_attendance"
 });
 con.connect(function(err) {
    if (err) {
@@ -52,7 +52,7 @@ wss.on('connection', function connection(ws){
       var userData;
       var userAssignedLocationData;
       var userAssignedNetworkData;
-      var mapAPIKey = 'AIzaSyBzQ7shRAOAFAdZtIpYp9bNnQnFerPgotw';
+      var mapAPIKey = 'AIzaSyD_iQ1GwgBkmiMxeUDiC7c3fQLmzdmddF0';
 
       var userQuery = "SELECT * FROM users WHERE id ="+parts[0]+" ";
       con.query(userQuery, function (err, result, fields) {
